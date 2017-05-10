@@ -5,7 +5,7 @@ import com.trilead.ssh2.auth.AuthenticationManager;
 import com.trilead.ssh2.channel.ChannelManager;
 import com.trilead.ssh2.crypto.CryptoWishList;
 import com.trilead.ssh2.crypto.cipher.BlockCipherFactory;
-import com.trilead.ssh2.crypto.digest.MAC;
+import com.trilead.ssh2.crypto.digest.MessageMac;
 import com.trilead.ssh2.log.Logger;
 import com.trilead.ssh2.packets.PacketIgnore;
 import com.trilead.ssh2.transport.ClientServerHello;
@@ -75,7 +75,7 @@ public class Connection
 	 */
 	public static synchronized String[] getAvailableMACs()
 	{
-		return MAC.getMacList();
+		return MessageMac.getMacs();
 	}
 
 	/**
@@ -99,6 +99,7 @@ public class Connection
 	private DHGexParameters dhgexpara = new DHGexParameters();
 
 	private final String hostname;
+	private final String sourceAddress;
 
 	private final int port;
 
@@ -135,8 +136,23 @@ public class Connection
 	 */
 	public Connection(String hostname, int port)
 	{
+		this(hostname, port, null);
+	}
+	
+	/**
+	 * Prepares a fresh <code>Connection</code> object which can then be used
+	 * to establish a connection to the specified SSH-2 server.
+	 * 
+	 * @param hostname
+	 *            the host where we later want to connect to.
+	 * @param port
+	 *            port on the server, normally 22.
+	 */
+	public Connection(String hostname, int port, String sourceAddress)
+	{
 		this.hostname = hostname;
 		this.port = port;
+		this.sourceAddress = sourceAddress;
 	}
 
 	/**
@@ -729,7 +745,7 @@ public class Connection
 
 		final TimeoutState state = new TimeoutState();
 
-		tm = new TransportManager(hostname, port);
+		tm = new TransportManager(hostname, port, sourceAddress);
 		
 		tm.setConnectionMonitors(connectionMonitors);
 
@@ -1265,7 +1281,7 @@ public class Connection
 		if ((macs == null) || (macs.length == 0))
 			throw new IllegalArgumentException();
 		macs = removeDuplicates(macs);
-		MAC.checkMacList(macs);
+		MessageMac.checkMacs(macs);
 		cryptoWishList.c2s_mac_algos = macs;
 	}
 
@@ -1311,7 +1327,7 @@ public class Connection
 			throw new IllegalArgumentException();
 
 		macs = removeDuplicates(macs);
-		MAC.checkMacList(macs);
+		MessageMac.checkMacs(macs);
 		cryptoWishList.s2c_mac_algos = macs;
 	}
 
@@ -1322,8 +1338,7 @@ public class Connection
 	 * Unless you know what you are doing, you will never need this.
 	 * 
 	 * @param algos
-	 *            An array of allowed server host key algorithms. SSH-2 defines
-	 *            <code>ssh-dss</code> and <code>ssh-rsa</code>. The
+	 *            An array of allowed server host key algorithms. The
 	 *            entries of the array must be ordered after preference, i.e.,
 	 *            the entry at index 0 is the most preferred one. You must
 	 *            specify at least one entry.
